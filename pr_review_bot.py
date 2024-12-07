@@ -4,7 +4,8 @@ from msrest.authentication import BasicAuthentication
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from azure.devops.v7_1.git.models import GitPullRequestSearchCriteria,Comment, CommentThread
+from azure.devops.v7_1.git.models import GitPullRequestSearchCriteria,Comment, CommentThread,GitVersionDescriptor,GitBaseVersionDescriptor,GitTargetVersionDescriptor
+import difflib
 
 # Load environment variables from .env file
 load_dotenv()
@@ -67,7 +68,7 @@ def analyze_pr_diff(pr_id, diff):
     prompt="Review the following pull request and provide a short 1 paragrpah feedback for all modified files.be short and summeraized for every file no more than 1 paragraph is allowed, Give attention to time complexity and clean code principles check for possible errors:"
     client = OpenAI(api_key=OpenAI_api_key)  # This is the default and can be omitted
 
-    response = client.chat.completions.create(
+    reponse = client.chat.completions.create(
         model=model_version,  # Correct model name
         messages=[{
             "role": "user",
@@ -104,69 +105,63 @@ def comment_on_pr(pr_id, comment):
     except Exception as e:
         print(f"Error commenting on PR {pr_id}: {str(e)}")
 
-# Fetch the diff content of a pull request
+
 def fetch_pr_diff(pr_id):
     try:
-        # Establish connection and get the Git client
         connection = get_azure_devops_connection()
         git_client = connection.clients.get_git_client()
-        
-        # Retrieve pull request iterations
-        iterations = git_client.get_pull_request_iterations(
-            repository_id=repository_id,
-            project=project_name,
-            pull_request_id=pr_id
-        )
-        
-        # Get the latest iteration
-        latest_iteration = max(iterations, key=lambda x: x.id)
-        
-        # Fetch changes for the latest iteration
-        iteration_changes = git_client.get_pull_request_iteration_changes(
-            repository_id=repository_id,
-            project=project_name,
-            pull_request_id=pr_id,
-            iteration_id=latest_iteration.id
-        )
-        
-        # Initialize the diff content
-        diff_content = ""
-        
-        # Loop through the changes to extract diffs for each file
-        for change in iteration_changes.change_entries:
-            if change.additional_properties['item'] is not None:  # Only process items with valid file information
-                change = change.additional_properties['item']
-                file_path = change['path']
-                
-                # Check the change type (e.g., modified, added, deleted)
-                change_type = iteration_changes.change_entries[0].additional_properties['changeType']
-                
-                # Process modified files
-                if change_type in ['edit', 'add']:
-                    # Fetch the file content of the latest version
-                    file_content = git_client.get_item_content(
-                        repository_id=repository_id,
-                        project=project_name,
-                        path=file_path
-                    )
-                    file_content_ = ''.join(chunk.decode('utf-8') for chunk in file_content)
-                    # Add file details to the diff content
-                    diff_content += f"File: {file_path}\n"
-                    diff_content += f"Change Type: {change_type}\n"
-                    diff_content += f"Content:\n{file_content_}\n\n"
-                elif change_type == 'delete':
-                    # If the file is deleted, just log the deletion
-                    diff_content += f"File: {file_path}\n"
-                    diff_content += f"Change Type: {change_type}\n"
-                    diff_content += "Content: File deleted.\n\n"
+        commits = git_client.get_pull_request_commits(project=project_name, repository_id=repository_id, pull_request_id=pr_id)
+        target_commit_id = commits[0].commit_id
+        base_commit_id = commits[-1].commit_id
 
-        return diff_content
+        base_version_descriptor = GitBaseVersionDescriptor(base_version=base_commit_id, base_version_type="commit")
+        target_version_descriptor = GitTargetVersionDescriptor(target_version=target_commit_id, target_version_type ="commit")
+
+        commit_diffs = git_client.get_commit_diffs(repository_id=repository_id, project=project_name, base_version_descriptor=base_version_descriptor, target_version_descriptor=target_version_descriptor)
+
+        # Get the list of changed files
+        for change in commit_diffs.changes:
+            print(change['item']['path'])
+                # Process diffs and print added/modified lines
+            for diff in commit_diffs.changes:
+                    if diff['changeType'] in ['add', 'edit']:
+                        file_path = diff['item']['path']
+                        file_content = git_client.get_item_text(
+                            repository_id=repository_id,
+                            path=file_path,
+                            project=project_name,
+                            version_descriptor=GitVersionDescriptor(
+                                version=target_commit_id,
+                                version_type="commit"
+                            )
+                        )
+                        file_content2 = git_client.get_item_text(
+                            repository_id=repository_id,
+                            path=file_path,
+                            project=project_name,
+                            version_descriptor=GitVersionDescriptor(
+                                version=base_commit_id,
+                                version_type="commit"
+                            )
+                        )
+                        changed_content = ''
+                        file_content_ = ''.join(chunk.decode('utf-8') for chunk in file_content)
+                        file_content2_ = ''.join(chunk.decode('utf-8') for chunk in file_content2)
+                        differ = difflib.Differ()
+                        diff = differ.compare(file_content_.splitlines(), file_content2_.splitlines())
+                        for line in diff:
+                                if line.startswith('- ') or line.startswith('+ '):
+                                    changed_content += line
+                        
+                        print(changed_content)
+                        return changed_content
+        
 
     except Exception as e:
-        print(f"Error fetching PR diff: {e}")
+        print(e)
         return None
 
-# Main function to fetch PRs and review them
+
 def review_pull_requests():
     try:
         pull_requests = get_pull_requests()
