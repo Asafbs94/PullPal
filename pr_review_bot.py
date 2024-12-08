@@ -105,7 +105,7 @@ def comment_on_pr(pr_id, comment):
         print(f"Error commenting on PR {pr_id}: {str(e)}")
 
 # Fetch the diff content of a pull request
-def fetch_pr_diff(pr_id):
+def fetch_pr_diff(pr_id, repository_id, project_name):
     try:
         # Establish connection and get the Git client
         connection = get_azure_devops_connection()
@@ -135,13 +135,13 @@ def fetch_pr_diff(pr_id):
         # Loop through the changes to extract diffs for each file
         for change in iteration_changes.change_entries:
             if change.additional_properties['item'] is not None:  # Only process items with valid file information
-                change = change.additional_properties['item']
-                file_path = change['path']
+                file_info = change.additional_properties['item']
+                file_path = file_info['path']
                 
                 # Check the change type (e.g., modified, added, deleted)
-                change_type = iteration_changes.change_entries[0].additional_properties['changeType']
+                change_type = change.additional_properties['changeType']
                 
-                # Process modified files
+                # Process modified or added files
                 if change_type in ['edit', 'add']:
                     # Fetch the file content of the latest version
                     file_content = git_client.get_item_content(
@@ -161,10 +161,8 @@ def fetch_pr_diff(pr_id):
                     diff_content += "Content: File deleted.\n\n"
 
         return diff_content
-
     except Exception as e:
-        print(f"Error fetching PR diff: {e}")
-        return None
+        return f"An error occurred: {e}"
 
 # Main function to fetch PRs and review them
 def review_pull_requests():
