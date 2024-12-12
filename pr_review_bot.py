@@ -215,7 +215,7 @@ def review_pull_requests():
 # Run the script
 if __name__ == "__main__":
     try:
-        app.run(port=5000)
+        app.run(port=flask_port)
     
     except Exception as e:
         print(f"An error occurred while reviewing pull requests: {str(e)}")
