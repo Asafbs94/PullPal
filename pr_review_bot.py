@@ -89,7 +89,7 @@ def analyze_pr_diff(pr_id, diff):
     model=model_version,
     stream=False,
 )
-    return  response
+    return   response.choices[0].message['content']
 
 
 
