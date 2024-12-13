@@ -6,7 +6,6 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from azure.devops.v7_0.git.models import GitPullRequestSearchCriteria,Comment, CommentThread,GitTargetVersionDescriptor,GitBaseVersionDescriptor
-from datetime import timedelta
 from flask import Flask
 import difflib
 
@@ -22,7 +21,7 @@ flask_port = os.getenv("FLASK_PORT")
 meta_llama_url = os.getenv("META_LLAMA_URL")
 IGNORED_AUTHORS = os.getenv("IGNORED_AUTHORS", "NONE").split(",")
 
-OpenAI_api_key = os.getenv("OPENAI_API_KEY")
+
 app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
@@ -225,7 +224,6 @@ def review_pull_requests():
 
 if __name__ == "__main__":
     try:
-        while True:
-            app.run(port=flask_port)
+        app.run(port=flask_port)
     except Exception as e:
         print(f"An error occurred while reviewing pull requests: {str(e)}")
