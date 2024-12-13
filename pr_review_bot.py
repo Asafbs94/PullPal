@@ -24,6 +24,7 @@ max_tokens = os.getenv("MAX_TOKENS")
 model_version = os.getenv("MODEL_VERSION")
 run_interval_hours = os.getenv("INTERVAL_HOURS")
 flask_port = os.getenv("FLASK_PORT")
+meta_llama_url = os.getenv("META_LLAMA_URL")
 # List of authors to ignore
 IGNORED_AUTHORS = os.getenv("IGNORED_AUTHORS", "NONE").split(",")
 
@@ -76,7 +77,7 @@ def is_recent_pr(creation_date):
     return now - pr_date <= timedelta(days=1)
 
 # Analyze the PR diff using OpenAI
-def analyze_pr_diff(diff, meta_llama_url, model_version, pr_id):
+def analyze_pr_diff(diff):
     try:
         prompt = (
             "Review the following pull request and provide a short 1 paragraph feedback for all modified files. "
@@ -101,7 +102,7 @@ def analyze_pr_diff(diff, meta_llama_url, model_version, pr_id):
         return response.choices[0].message['content']
     
     except Exception as e:
-        print(f"Error analyzing PR {pr_id}: {str(e)}")
+        print(f"Error analyzing PR : {str(e)}")
         return ""
 
 
