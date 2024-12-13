@@ -13,8 +13,6 @@ import difflib
 # Load environment variables from .env file
 load_dotenv()
 
-# Set up OpenAI API key from environment variables
-OpenAI_api_key = os.getenv("OPENAI_API_KEY")
 # Azure DevOps Organization and Project details from environment variables
 organization_url = os.getenv("AZURE_ORG_URL")
 personal_access_token = os.getenv("AZURE_PAT")
