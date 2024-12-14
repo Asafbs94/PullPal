@@ -1,16 +1,16 @@
 from llama_stack_client import LlamaStackClient
-from llama_stack_client.types import UserMessage
 from azure.devops.connection import Connection
 from msrest.authentication import BasicAuthentication
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from azure.devops.v7_0.git.models import GitPullRequestSearchCriteria,Comment, CommentThread,GitTargetVersionDescriptor,GitBaseVersionDescriptor
-from flask import Flask
+from flask import Flask, request, jsonify
 import difflib
 
 load_dotenv()
 
+meta_llama_url = os.getenv("META_LLAMA_URL")
 organization_url = os.getenv("AZURE_ORG_URL")
 personal_access_token = os.getenv("AZURE_PAT")
 project_name = os.getenv("PROJECT_NAME")
@@ -18,11 +18,11 @@ repository_id = os.getenv("REPO_ID")
 max_tokens = os.getenv("MAX_TOKENS")
 model_version = os.getenv("MODEL_VERSION")
 flask_port = os.getenv("FLASK_PORT")
-meta_llama_url = os.getenv("META_LLAMA_URL")
 IGNORED_AUTHORS = os.getenv("IGNORED_AUTHORS", "NONE").split(",")
 
-
 app = Flask(__name__)
+
+processed_prs = set()
 
 def validate_env_variables():
     required_vars = [
@@ -33,15 +33,17 @@ def validate_env_variables():
     if missing_vars:
         raise EnvironmentError(f"Missing environment variables: {', '.join(missing_vars)}")
 
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        get_pull_requests()
+        data = request.json
+        pr_id = data.get("resource",{}).get("pullRequestId")
+        review_pull_requests(pr_id)
         return "Pull requests reviewed", 200
     except Exception as e:
-        logging.error(f"Error in webhook endpoint: {e}")
+        print(e)
         return "Internal Server Error", 500
-
 
 # Authenticate to Azure DevOps
 def get_azure_devops_connection():
@@ -54,18 +56,16 @@ def get_azure_devops_connection():
         return None
 
 # Get pull requests from Azure DevOps
-def get_pull_requests():
+def get_pull_requests(pr_id):
     try:
         connection = get_azure_devops_connection()
         if connection is None:
             return []
 
-        criteria = GitPullRequestSearchCriteria(status='active')
         git_client = connection.clients.get_git_client()
-        pull_requests = git_client.get_pull_requests(
+        pull_requests = git_client.get_pull_request_by_id(
             project=project_name,
-            repository_id=repository_id,
-            search_criteria=criteria
+            pull_request_id=pr_id
         )
         return pull_requests
     except Exception as e:
@@ -79,7 +79,7 @@ def is_author_ignored(author):
 # Filter PRs created in the last 24 hours
 def is_recent_pr(creation_date):
     now = datetime.utcnow()
-    pr_date = datetime.strptime(creation_date, "%Y-%m-%dT%H:%M:%SZ")  # Azure DevOps uses ISO 8601 format
+    pr_date = datetime.strptime(creation_date, "%Y-%m-%dT%H:%M:%SZ") 
     return now - pr_date <= timedelta(days=1)
 
 # Analyze the PR diff using OpenAI
@@ -109,7 +109,7 @@ def analyze_pr_diff(diff):
     except Exception as e:
         print(f"Error analyzing PR : {str(e)}")
         return ""
-
+        
 
 # Comment on the pull request
 def comment_on_pr(pr_id, comment):
@@ -174,7 +174,7 @@ def fetch_pr_diff(pr_id):
                 repository_id=repository_id,
                 project=project_name,
                 path=file_path,
-                download=True, 
+                download=True,  
                 version_descriptor=GitBaseVersionDescriptor(
                     version=pr.source_ref_name.replace('refs/heads/', ''),
                     version_type="branch"
@@ -185,7 +185,7 @@ def fetch_pr_diff(pr_id):
                 repository_id=repository_id,
                 project=project_name,
                 path=file_path,
-                download=True,  # Important: This forces content download
+                download=True, 
                 version_descriptor=GitTargetVersionDescriptor(
                     version=pr.target_ref_name.replace('refs/heads/', ''),
                     version_type="branch"
@@ -194,6 +194,7 @@ def fetch_pr_diff(pr_id):
             
             pr_text = ''.join(chunk.decode('utf-8') for chunk in pr_content)
             target_text = ''.join(chunk.decode('utf-8') for chunk in target_content)
+            
             differ = difflib.Differ()
             diff = differ.compare(pr_text.splitlines(), target_text.splitlines()) 
             actual_changes = [line.lstrip('-+ ')  for line in diff if line.startswith(('- ', '+ '))]
@@ -212,33 +213,33 @@ def fetch_pr_diff(pr_id):
 
 
 # Main function to fetch PRs and review them
-def review_pull_requests():
+def review_pull_requests(pr_id):
     try:
-        pull_requests = get_pull_requests()
-        for pr in pull_requests:
-            author_name = pr.created_by.display_name
+        pr = get_pull_requests(pr_id)
+        author_name = pr.created_by.display_name
 
-            if author_name in IGNORED_AUTHORS:
-                print(f"Ignoring PR #{pr.pull_request_id} by {author_name}")
-                continue
-
+        if author_name in IGNORED_AUTHORS:
+            print(f"Ignoring PR #{pr.pull_request_id} by {author_name}")
             print(f"Reviewing PR #{pr.pull_request_id} - {pr.title} by {author_name}")
 
-            diff = fetch_pr_diff(pr.pull_request_id)
-            if diff:
-                print(f"Fetched diff content for PR #{pr.pull_request_id}")
+        diff = fetch_pr_diff(pr.pull_request_id)
+        if diff:
+            print(f"Fetched diff content for PR #{pr.pull_request_id}")
 
-                review_comment = analyze_pr_diff(diff)
-                comment_on_pr(pr.pull_request_id, review_comment)
-                print(f"Posted review comment on PR #{pr.pull_request_id}")
-            else:
-                print(f"No diff content found for PR #{pr.pull_request_id}")
+            review_comment = analyze_pr_diff(diff)
+            comment_on_pr(pr.pull_request_id, review_comment)
+            print(f"Posted review comment on PR #{pr.pull_request_id}")
+        else:
+            print(f"No diff content found for PR #{pr.pull_request_id}")
     except Exception as e:
         print(f"Error reviewing pull requests: {str(e)}")
 
 if __name__ == "__main__":
     try:
-        validate_env_variables()
+        validate_env_variables()   
+        # Start ngrok tunnel
+        flask_port = int(flask_port)
+        # Start Flask app
         app.run(port=flask_port)
     except Exception as e:
         print(f"An error occurred while reviewing pull requests: {str(e)}")
