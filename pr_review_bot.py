@@ -5,8 +5,8 @@ from msrest.authentication import BasicAuthentication
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from azure.devops.v7_0.git.models import GitPullRequestSearchCriteria,Comment, CommentThread,GitTargetVersionDescriptor,GitBaseVersionDescriptor
-from flask import Flask, request, jsonify
+from azure.devops.v7_0.git.models import Comment, CommentThread,GitTargetVersionDescriptor,GitBaseVersionDescriptor
+from flask import Flask, request
 import difflib
 
 load_dotenv()
