@@ -216,6 +216,7 @@ def review_pull_requests(pr_id):
         if author_name in IGNORED_AUTHORS:
             print(f"Ignoring PR #{pr.pull_request_id} by {author_name}")
             print(f"Reviewing PR #{pr.pull_request_id} - {pr.title} by {author_name}")
+            return
 
         diff = fetch_pr_diff(pr.pull_request_id)
         if diff:
