@@ -18,7 +18,7 @@ project_name = os.getenv("PROJECT_NAME")
 repository_id = os.getenv("REPO_ID")
 max_tokens = os.getenv("MAX_TOKENS")
 model_version = os.getenv("MODEL_VERSION")
-flask_port = os.getenv("FLASK_PORT")
+flask_port = os.getenv("FLASK_PORT","8080")
 IGNORED_AUTHORS = os.getenv("IGNORED_AUTHORS", "NONE").split(",")
 
 app = Flask(__name__)
