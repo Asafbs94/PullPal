@@ -237,9 +237,7 @@ def review_pull_requests(pr_id):
 if __name__ == "__main__":
     try:
         validate_env_variables()   
-        # Start ngrok tunnel
         flask_port = int(flask_port)
-        # Start Flask app
         app.run(port=flask_port)
     except Exception as e:
         print(f"An error occurred while reviewing pull requests: {str(e)}")
