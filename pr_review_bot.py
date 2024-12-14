@@ -77,12 +77,6 @@ def get_pull_requests(pr_id):
 def is_author_ignored(author):
     return author.lower() in [ignored_author.lower() for ignored_author in IGNORED_AUTHORS]
 
-# Filter PRs created in the last 24 hours
-def is_recent_pr(creation_date):
-    now = datetime.utcnow()
-    pr_date = datetime.strptime(creation_date, "%Y-%m-%dT%H:%M:%SZ") 
-    return now - pr_date <= timedelta(days=1)
-
 # Analyze the PR diff using OpenAI
 def analyze_pr_diff(diff):
     try:
