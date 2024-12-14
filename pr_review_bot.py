@@ -1,5 +1,6 @@
 from llama_stack_client import LlamaStackClient
 from azure.devops.connection import Connection
+from llama_stack_client.types import UserMessage
 from msrest.authentication import BasicAuthentication
 import os
 from dotenv import load_dotenv
