@@ -40,6 +40,8 @@ def webhook():
     try:
         data = request.json
         pr_id = data.get("resource",{}).get("pullRequestId")
+        if not pr_id:
+            return "no pr_id is provided",500
         review_pull_requests(pr_id)
         return "Pull requests reviewed", 200
     except Exception as e:
@@ -211,6 +213,8 @@ def fetch_pr_diff(pr_id):
 def review_pull_requests(pr_id):
     try:
         pr = get_pull_requests(pr_id)
+        if not pr:
+            return None
         author_name = pr.created_by.display_name
 
         if author_name in IGNORED_AUTHORS:
