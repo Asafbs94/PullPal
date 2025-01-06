@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 from azure.devops.v7_0.git.models import Comment, CommentThread,GitTargetVersionDescriptor,GitBaseVersionDescriptor
 from flask import Flask, request
 import difflib
+from logger import setup_logger
 
+logger = setup_logger()
 load_dotenv()
 
 OpenAI_api_key = os.getenv("OPENAI_API_KEY")
@@ -24,6 +26,7 @@ app = Flask(__name__)
 
 processed_prs = set()
 
+
 def validate_env_variables():
     required_vars = [
         "AZURE_ORG_URL", "AZURE_PAT", "PROJECT_NAME", 
@@ -31,7 +34,9 @@ def validate_env_variables():
     ]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     if missing_vars:
+        logger.error(f"Missing environment variables: {', '.join(missing_vars)}")
         raise EnvironmentError(f"Missing environment variables: {', '.join(missing_vars)}")
+    logger.info("Environment variables validated")
 
 
 @app.route('/webhook', methods=['POST'])
@@ -42,18 +47,21 @@ def webhook():
         review_pull_requests(pr_id)
         return "Pull requests reviewed", 200
     except Exception as e:
-        print(e)
+        logger.error(f"Webhook processing failed: {e}")
         return "Internal Server Error", 500
+
 
 # Authenticate to Azure DevOps
 def get_azure_devops_connection():
     try:
         credentials = BasicAuthentication('', personal_access_token)
         connection = Connection(base_url=organization_url, creds=credentials)
+        logger.info("Connected to Azure DevOps successfully.")
         return connection
     except Exception as e:
-        print(f"Error connecting to Azure DevOps: {str(e)}")
+        logger.error(f"Error connecting to Azure DevOps: {str(e)}")
         return None
+
 
 # Get pull requests from Azure DevOps
 def get_pull_requests(pr_id):
@@ -69,12 +77,14 @@ def get_pull_requests(pr_id):
         )
         return pull_requests
     except Exception as e:
-        print(f"Error fetching pull requests: {str(e)}")
+        logger.error(f"Error fetching pull requests: {str(e)}")
         return []
+
 
 # Check if PR author is ignored
 def is_author_ignored(author):
     return author.lower() in [ignored_author.lower() for ignored_author in IGNORED_AUTHORS]
+
 
 # Analyze the PR diff using OpenAI
 def analyze_pr_diff(diff):
@@ -95,10 +105,9 @@ def analyze_pr_diff(diff):
         )
         return response.choices[0].text.strip()
     except Exception as e:
-        print(f"Error analyzing PR: {str(e)}")
+        logger.error(f"Error analyzing PR: {str(e)}")
         return ""
 
-        
 
 # Comment on the pull request
 def comment_on_pr(pr_id, comment):
@@ -120,9 +129,10 @@ def comment_on_pr(pr_id, comment):
             pull_request_id=pr_id,
             comment_thread=thread
         )
-        print(f"Comment posted on PR #{pr_id}")
+        logger.info(f"Comment posted on PR #{pr_id}")
     except Exception as e:
-        print(f"Error commenting on PR {pr_id}: {str(e)}")
+        logger.error(f"Error commenting on PR {pr_id}: {str(e)}")
+
 
 # Fetch the diff content of a pull request
 def fetch_pr_diff(pr_id):
@@ -130,11 +140,10 @@ def fetch_pr_diff(pr_id):
     git_client = connection.clients.get_git_client()
 
     pr = git_client.get_pull_request_by_id(pr_id)
-    
-    print(f"\nPR Details:")
-    print(f"PR ID: {pr.pull_request_id}")
-    print(f"Source: {pr.source_ref_name}")
-    print(f"Target: {pr.target_ref_name}")
+
+    logger.debug(f"PR ID: {pr.pull_request_id}")
+    logger.debug(f"Source: {pr.source_ref_name}")
+    logger.debug(f"Target: {pr.target_ref_name}")
     
     iterations = git_client.get_pull_request_iterations(
         project=project_name,
@@ -143,6 +152,7 @@ def fetch_pr_diff(pr_id):
     )
     
     latest_iteration = iterations[-1].id
+    logger.debug(f"Latest iteration ID: {latest_iteration}")
     
     changes = git_client.get_pull_request_iteration_changes(
         project=project_name,
@@ -151,12 +161,12 @@ def fetch_pr_diff(pr_id):
         iteration_id=latest_iteration
     )
     
-    print(f"\nNumber of changes found: {len(changes.change_entries)}")
+    logger.debug(f"\nNumber of changes found: {len(changes.change_entries)}")
     
     changed_content = []
     for change in changes.change_entries:
         file_path = change.additional_properties['item']['path']
-        print(f"\nProcessing {file_path}")
+        logger.debug(f"\nProcessing {file_path}")
         
         try:
             pr_content = git_client.get_item_content(
@@ -196,9 +206,8 @@ def fetch_pr_diff(pr_id):
             else:
                 file_changes = None
         except Exception as e:
-            print(f"Error processing {file_path}: {str(e)}")
+            logger.error(f"Error processing {file_path}: {str(e)}")
     return changed_content
-
 
 
 # Main function to fetch PRs and review them
@@ -210,21 +219,22 @@ def review_pull_requests(pr_id):
         author_name = pr.created_by.display_name
 
         if author_name in IGNORED_AUTHORS:
-            print(f"Ignoring PR #{pr.pull_request_id} by {author_name}")
-            print(f"Reviewing PR #{pr.pull_request_id} - {pr.title} by {author_name}")
+            logger.info(f"Ignoring PR #{pr.pull_request_id} by {author_name}")
+            logger.info(f"Reviewing PR #{pr.pull_request_id} - {pr.title} by {author_name}")
             return
 
         diff = fetch_pr_diff(pr.pull_request_id)
         if diff:
-            print(f"Fetched diff content for PR #{pr.pull_request_id}")
+            logger.info(f"Fetched diff content for PR #{pr.pull_request_id}")
 
             review_comment = analyze_pr_diff(diff)
             comment_on_pr(pr.pull_request_id, review_comment)
-            print(f"Posted review comment on PR #{pr.pull_request_id}")
+            logger.info(f"Posted review comment on PR #{pr.pull_request_id}")
         else:
-            print(f"No diff content found for PR #{pr.pull_request_id}")
+            logger.info(f"No diff content found for PR #{pr.pull_request_id}")
     except Exception as e:
-        print(f"Error reviewing pull requests: {str(e)}")
+        logger.error(f"Error reviewing pull requests: {str(e)}")
+
 
 if __name__ == "__main__":
     try:
@@ -232,4 +242,4 @@ if __name__ == "__main__":
         flask_port = int(flask_port)
         app.run(port=flask_port)
     except Exception as e:
-        print(f"An error occurred while reviewing pull requests: {str(e)}")
+        logger.error(f"An error occurred while reviewing pull requests: {str(e)}")
