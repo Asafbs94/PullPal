@@ -165,6 +165,10 @@ def fetch_pr_diff(pr_id):
     for change in changes.change_entries:
         file_path = change.additional_properties['item']['path']
         print(f"\nProcessing {file_path}")
+        file_extension = os.path.splitext(file_path)[1]
+        if file_extension in IGNORED_FILE_TYPES:
+            logger.info(f"Skipping file {file_path} due to ignored file type.")
+            continue
         
         try:
             pr_content = git_client.get_item_content(
