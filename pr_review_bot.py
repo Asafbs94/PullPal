@@ -21,6 +21,7 @@ max_tokens = os.getenv("MAX_TOKENS")
 model_version = os.getenv("MODEL_VERSION")
 flask_port = os.getenv("FLASK_PORT")
 IGNORED_AUTHORS = os.getenv("IGNORED_AUTHORS", "NONE").split(",")
+IGNORED_FILE_TYPES = os.getenv("IGNORED_FILE_TYPES", "NONE").split(",")
 
 app = Flask(__name__)
 
