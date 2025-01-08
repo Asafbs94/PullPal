@@ -31,11 +31,13 @@ REPO_ID: Your Azure DevOps repository ID.
 
 IGNORED_AUTHORS: A comma-separated list of authors to ignore.
 
-LOG_PATH: Log path
+IGNORED_FILE_TYPES: List of igonred file types to avoid review.
 
-LOG_LEVEL: Requested log level for logging
+LOG_PATH: Log path.
 
-PRINT_TO_CONSOLE: BOOLEAN eithr print or not to the console
+LOG_LEVEL: Requested log level for logging.
+
+PRINT_TO_CONSOLE: BOOLEAN eithr print or not to the console.
 
 ## Run the Script 🏃‍♂️
 
