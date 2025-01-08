@@ -1,6 +1,6 @@
 
 
-![alt text](https://i.ibb.co/c2Fqyp7/IMG-7647.png)
+![alt text](https://i.ibb.co/3BSTZBJ/IMG-7647.png)
 
 ## AI-Powered Pull Request Reviewer 🚀
 
@@ -31,7 +31,11 @@ REPO_ID: Your Azure DevOps repository ID.
 
 IGNORED_AUTHORS: A comma-separated list of authors to ignore.
 
-INTERVAL_HOURS: running interval for fetching the PR's
+LOG_PATH: Log path
+
+LOG_LEVEL: Requested log level for logging
+
+PRINT_TO_CONSOLE: BOOLEAN eithr print or not to the console
 
 ## Run the Script 🏃‍♂️
 
