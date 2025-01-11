@@ -99,11 +99,15 @@ def analyze_pr_diff(diff):
             file_name = item.get("file", "Unknown File")
             changes = item.get("changes", "No changes provided")
             prompt += f"File: {file_name}\n{changes}\n\n"
-        response = openai.Completion.create(
+        response = openai.chat.completions.create(
         model=model_version,
-        prompt=prompt,
-        max_tokens=max_tokens
-        )
+        messages=[
+        {
+            "role": "user",
+            "content": prompt,
+        }
+    ],
+)
         return response.choices[0].text.strip()
     except Exception as e:
         logger.error(f"Error analyzing PR: {str(e)}")
